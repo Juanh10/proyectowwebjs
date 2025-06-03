@@ -1,9 +1,11 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const express = require('express');
-const qrcode = require('qrcode-terminal');
+const QRCode = require('qrcode');
 
 const app = express();
 app.use(express.json());
+
+let qrCodeData = null;
 
 const client = new Client({
     authStrategy: new LocalAuth(),
@@ -13,25 +15,28 @@ const client = new Client({
 });
 
 client.on('qr', (qr) => {
-    qrcode.generate(qr, {small: true});
-    console.log('Escanea este código QR con WhatsApp');
+    qrCodeData = qr;
+    console.log('QR recibido. Escanea en la web /qr');
 });
 
 client.on('ready', () => {
     console.log('Cliente WhatsApp listo');
+    qrCodeData = null;
 });
 
 client.initialize();
 
+app.get('/qr', async (req, res) => {
+    if (!qrCodeData) return res.send('Cliente ya autenticado o QR no disponible.');
+    const qrImageUrl = await QRCode.toDataURL(qrCodeData);
+    res.send(`<img src="${qrImageUrl}" style="width: 300px;" />`);
+});
+
 app.post('/api/enviar', async (req, res) => {
     const { numero, mensaje } = req.body;
-
-    if(!numero || !mensaje) {
-        return res.status(400).send({ error: 'Faltan número o mensaje' });
-    }
+    if (!numero || !mensaje) return res.status(400).send({ error: 'Faltan número o mensaje' });
 
     const numeroFormateado = numero.includes('@c.us') ? numero : numero + '@c.us';
-
     try {
         await client.sendMessage(numeroFormateado, mensaje);
         res.send({ success: true, msg: 'Mensaje enviado' });
