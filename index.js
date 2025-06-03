@@ -34,18 +34,34 @@ app.get('/qr', async (req, res) => {
 
 app.post('/api/enviar', async (req, res) => {
     const { numero, mensaje } = req.body;
-    if (!numero || !mensaje) return res.status(400).send({ error: 'Faltan número o mensaje' });
+
+    console.log('Solicitud recibida:', numero, mensaje);
+
+    if (!numero || !mensaje) {
+        return res.status(400).send({ error: 'Faltan número o mensaje' });
+    }
 
     const numeroFormateado = numero.includes('@c.us') ? numero : numero + '@c.us';
+
     try {
-        await client.sendMessage(numeroFormateado, mensaje);
+        const enviado = await Promise.race([
+            client.sendMessage(numeroFormateado, mensaje),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Tiempo de espera excedido')), 15000)
+            )
+        ]);
+
+        console.log('Mensaje enviado correctamente');
         res.send({ success: true, msg: 'Mensaje enviado' });
+
     } catch (error) {
+        console.error('Error al enviar mensaje:', error.message);
         res.status(500).send({ error: error.message });
     }
 });
 
+
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
-  console.log(`Servidor escuchando en puerto ${port}`);
+    console.log(`Servidor escuchando en puerto ${port}`);
 });
