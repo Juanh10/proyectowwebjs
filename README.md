@@ -24,7 +24,7 @@ Genera un **código QR** para iniciar sesión en WhatsApp y permite manejar mens
 
 1. **Clonar el repositorio:**
    ```bash
-   git clone https://github.com/Juanh10/proyectowebjs.git
+   git clone https://github.com/Juanh10/proyectowwebjs.git
    cd proyectowebjs
 
 2. **Instalar dependencias:**
