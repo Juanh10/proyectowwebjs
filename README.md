@@ -41,7 +41,9 @@ Escanéalo con la aplicación de WhatsApp en tu celular para vincular la sesión
 👨‍💻 Autor
 
 Juan David Hernández
+
 📍 Espinal, Tolima – Colombia
+
 💼 Estudiante de Ingeniería de Sistemas | Programador Junior
 
 ⚠️ Nota importante
