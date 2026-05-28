@@ -6,6 +6,7 @@ const app = express();
 app.use(express.json());
 
 let qrCodeData = null;
+let clienteListo = false;
 
 const client = new Client({
     authStrategy: new LocalAuth(),
@@ -16,7 +17,6 @@ const client = new Client({
             '--disable-setuid-sandbox',
             '--disable-dev-shm-usage',
             '--disable-gpu',
-            '--disable-software-rasterizer',
             '--disable-extensions'
         ]
     }
@@ -24,63 +24,48 @@ const client = new Client({
 
 client.on('qr', (qr) => {
     qrCodeData = qr;
+    clienteListo = false;
     console.log('QR recibido. Escanea en la web /qr');
-});
-
-client.on('ready', () => {
-    console.log('Cliente WhatsApp listo');
-    qrCodeData = null;
-});
-
-client.on('auth_failure', (msg) => {
-    console.error('Fallo de autenticación:', msg);
-});
-
-client.on('disconnected', (reason) => {
-    console.log('Desconectado:', reason);
-});
-
-async function iniciarWhatsApp() {
-    try {
-        await client.destroy();
-    } catch (e) {}
-
-    try {
-        await client.initialize();
-        console.log('WhatsApp inicializando...');
-    } catch (err) {
-        console.error('Error al inicializar:', err.message);
-    }
-}
-
-client.on('loading_screen', (percent, message) => {
-    console.log(`Cargando: ${percent}% - ${message}`);
 });
 
 client.on('authenticated', () => {
     console.log('Autenticado correctamente');
 });
 
-iniciarWhatsApp();
+client.on('ready', () => {
+    console.log('Cliente WhatsApp listo');
+    clienteListo = true;
+    qrCodeData = null;
+});
+
+client.on('disconnected', (reason) => {
+    console.log('Desconectado:', reason);
+    clienteListo = false;
+});
+
+client.initialize().catch(err => {
+    console.error('Error al inicializar:', err.message);
+});
 
 app.get('/qr', async (req, res) => {
-    if (!qrCodeData) return res.send('Cliente ya autenticado o QR no disponible.');
+    if (!qrCodeData) return res.send('QR no disponible o ya autenticado.');
     const qrImageUrl = await QRCode.toDataURL(qrCodeData);
-    res.send(`<img src="${qrImageUrl}" style="width: 300px;" />`);
+    res.send(`<img src="${qrImageUrl}" style="width:300px"/>`);
 });
 
 app.get('/status', (req, res) => {
-    res.send({
-        qrDisponible: !!qrCodeData,
-        clienteListo: client.info ? true : false,
-        info: client.info || null
-    });
+    res.send({ listo: clienteListo, info: client.info || null });
 });
 
-app.post('/api/enviar', async (req, res) => {
-    const { numero, mensaje } = req.body;
+app.all('/api/enviar', async (req, res) => {
+    const { numero, mensaje } = req.method === 'GET' ? req.query : req.body;
 
     console.log('Solicitud recibida:', numero, mensaje);
+
+    if (!clienteListo) {
+        console.error('Cliente no está listo todavía');
+        return res.status(503).send({ error: 'WhatsApp no está listo, intenta en unos segundos' });
+    }
 
     if (!numero || !mensaje) {
         return res.status(400).send({ error: 'Faltan número o mensaje' });
@@ -89,16 +74,9 @@ app.post('/api/enviar', async (req, res) => {
     const numeroFormateado = numero.includes('@c.us') ? numero : numero + '@c.us';
 
     try {
-        await Promise.race([
-            client.sendMessage(numeroFormateado, mensaje),
-            new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Tiempo de espera excedido')), 15000)
-            )
-        ]);
-
-        console.log('Mensaje enviado correctamente');
+        await client.sendMessage(numeroFormateado, mensaje);
+        console.log('Mensaje enviado correctamente a', numero);
         res.send({ success: true, msg: 'Mensaje enviado' });
-
     } catch (error) {
         console.error('Error al enviar mensaje:', error.message);
         res.status(500).send({ error: error.message });
