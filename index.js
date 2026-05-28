@@ -10,7 +10,15 @@ let qrCodeData = null;
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        headless: true,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--no-zygote',
+            '--single-process',
+            '--disable-gpu'
+        ]
     }
 });
 
@@ -25,6 +33,10 @@ client.on('ready', () => {
 });
 
 client.initialize();
+
+client.initialize().catch(err => {
+    console.error('Error al inicializar WhatsApp:', err.message);
+});
 
 app.get('/qr', async (req, res) => {
     if (!qrCodeData) return res.send('Cliente ya autenticado o QR no disponible.');
@@ -65,3 +77,4 @@ const port = process.env.PORT || 3000;
 app.listen(port, () => {
     console.log(`Servidor escuchando en puerto ${port}`);
 });
+
