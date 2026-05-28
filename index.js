@@ -1,12 +1,3 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const express = require('express');
-const QRCode = require('qrcode');
-
-const app = express();
-app.use(express.json());
-
-let qrCodeData = null;
-
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
@@ -32,49 +23,26 @@ client.on('ready', () => {
     qrCodeData = null;
 });
 
-client.initialize();
-
-client.initialize().catch(err => {
-    console.error('Error al inicializar WhatsApp:', err.message);
+client.on('auth_failure', (msg) => {
+    console.error('Fallo de autenticación:', msg);
 });
 
-app.get('/qr', async (req, res) => {
-    if (!qrCodeData) return res.send('Cliente ya autenticado o QR no disponible.');
-    const qrImageUrl = await QRCode.toDataURL(qrCodeData);
-    res.send(`<img src="${qrImageUrl}" style="width: 300px;" />`);
+client.on('disconnected', (reason) => {
+    console.log('Desconectado:', reason);
 });
 
-app.post('/api/enviar', async (req, res) => {
-    const { numero, mensaje } = req.body;
-
-    console.log('Solicitud recibida:', numero, mensaje);
-
-    if (!numero || !mensaje) {
-        return res.status(400).send({ error: 'Faltan número o mensaje' });
-    }
-
-    const numeroFormateado = numero.includes('@c.us') ? numero : numero + '@c.us';
+// ← ESTO ES LO NUEVO: destruir antes de inicializar
+async function iniciarWhatsApp() {
+    try {
+        await client.destroy(); // Limpia cualquier sesión anterior
+    } catch (e) {} // Ignorar error si no había nada
 
     try {
-        const enviado = await Promise.race([
-            client.sendMessage(numeroFormateado, mensaje),
-            new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Tiempo de espera excedido')), 15000)
-            )
-        ]);
-
-        console.log('Mensaje enviado correctamente');
-        res.send({ success: true, msg: 'Mensaje enviado' });
-
-    } catch (error) {
-        console.error('Error al enviar mensaje:', error.message);
-        res.status(500).send({ error: error.message });
+        await client.initialize();
+        console.log('WhatsApp inicializando...');
+    } catch (err) {
+        console.error('Error al inicializar:', err.message);
     }
-});
+}
 
-
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-    console.log(`Servidor escuchando en puerto ${port}`);
-});
-
+iniciarWhatsApp();
