@@ -53,12 +53,28 @@ async function iniciarWhatsApp() {
     }
 }
 
+client.on('loading_screen', (percent, message) => {
+    console.log(`Cargando: ${percent}% - ${message}`);
+});
+
+client.on('authenticated', () => {
+    console.log('Autenticado correctamente');
+});
+
 iniciarWhatsApp();
 
 app.get('/qr', async (req, res) => {
     if (!qrCodeData) return res.send('Cliente ya autenticado o QR no disponible.');
     const qrImageUrl = await QRCode.toDataURL(qrCodeData);
     res.send(`<img src="${qrImageUrl}" style="width: 300px;" />`);
+});
+
+app.get('/status', (req, res) => {
+    res.send({
+        qrDisponible: !!qrCodeData,
+        clienteListo: client.info ? true : false,
+        info: client.info || null
+    });
 });
 
 app.post('/api/enviar', async (req, res) => {
